@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright The XCSoar Project
 
-#include "Download.hpp"
-#include "Request.hpp"
+#include "Store.hpp"
+#include "LocalPath.hpp"
 #include "Operation/ProgressListener.hpp"
 #include "net/http/CoDownloadToFile.hpp"
 #include "system/FileUtil.hpp"
-#include "Language/Language.hpp"
 
 #include <algorithm>
 #include <map>
@@ -14,10 +13,67 @@
 
 namespace EDL {
 
+static constexpr char BASE_URL[] =
+  "https://www.edl-soaring.com/mbtiles/extract_mbtiles_from_date.php";
+
 bool
 CachedDay::IsComplete() const noexcept
 {
   return file_count >= 24u * NUM_ISOBARS;
+}
+
+StaticString<32>
+TileRequest::BuildForecastParameter() const noexcept
+{
+  StaticString<32> parameter;
+  parameter.Format("%04u-%02u-%02u+%02u:%02u:%02u",
+                   forecast.year, forecast.month, forecast.day,
+                   forecast.hour, forecast.minute, forecast.second);
+  return parameter;
+}
+
+StaticString<256>
+TileRequest::BuildDownloadUrl() const noexcept
+{
+  const auto date_parameter = BuildForecastParameter();
+
+  StaticString<256> url;
+  url.Format("%s?fdate=%s&isobare=%u",
+             BASE_URL, date_parameter.c_str(), isobar);
+  return url;
+}
+
+StaticString<64>
+TileRequest::BuildCacheFileName() const noexcept
+{
+  StaticString<64> filename;
+  filename.Format("%04u%02u%02u_%02u%02u%02u_%u.mbtiles",
+                  forecast.year, forecast.month, forecast.day,
+                  forecast.hour, forecast.minute, forecast.second,
+                  isobar);
+  return filename;
+}
+
+AllocatedPath
+BuildCacheDirectory() noexcept
+{
+  const auto weather_path = LocalPath("weather");
+  Directory::Create(weather_path);
+  auto edl_path = AllocatedPath::Build(weather_path, Path("edl"));
+  Directory::Create(edl_path);
+  auto mbtiles_path = AllocatedPath::Build(edl_path, Path("mbtiles"));
+  Directory::Create(mbtiles_path);
+
+  return mbtiles_path;
+}
+
+AllocatedPath
+TileRequest::BuildCachePath() const noexcept
+{
+  const auto mbtiles_path = BuildCacheDirectory();
+
+  const auto filename = BuildCacheFileName();
+  return AllocatedPath::Build(mbtiles_path, Path(filename.c_str()));
 }
 
 static BrokenDateTime
@@ -43,12 +99,12 @@ ParseCacheFileName(Path filename, BrokenDateTime &forecast) noexcept
 }
 
 Co::Task<AllocatedPath>
-EnsureDownloaded(BrokenDateTime forecast, unsigned isobar,
-                 CurlGlobal &curl, ProgressListener &progress)
+TileRequest::EnsureDownloaded(CurlGlobal &curl,
+                              ProgressListener &progress) const
 {
-  auto path = BuildCachePath(forecast, isobar);
+  auto path = BuildCachePath();
   if (!File::ExistsAny(path)) {
-    const auto url = BuildDownloadUrl(forecast, isobar);
+    const auto url = BuildDownloadUrl();
     const auto ignored = co_await Net::CoDownloadToFile(curl, url.c_str(),
                                                         nullptr, nullptr,
                                                         path, nullptr,
@@ -74,7 +130,8 @@ EnsureDayDownloaded(BrokenDateTime day, CurlGlobal &curl,
     for (unsigned isobar : ISOBARS) {
       progress.SetProgressPosition(position++);
 
-      const auto ignored = co_await EnsureDownloaded(forecast, isobar, curl, progress);
+      const auto ignored =
+        co_await TileRequest(forecast, isobar).EnsureDownloaded(curl, progress);
       (void)ignored;
     }
   }

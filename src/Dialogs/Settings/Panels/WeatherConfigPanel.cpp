@@ -71,7 +71,7 @@ WeatherConfigPanel::Prepare(ContainerWindow &parent,
              settings.enable_tim);
   AddBoolean("EDL Weather Page",
              _("Enable the dedicated EDL MBTiles weather page."),
-             settings.enable_edl);
+             settings.edl.enabled);
 #endif
 }
 
@@ -105,7 +105,7 @@ WeatherConfigPanel::Save(bool &_changed) noexcept
   changed |= SaveValue(ENABLE_TIM, ProfileKeys::EnableThermalInformationMap,
                        settings.enable_tim);
   changed |= SaveValue(ENABLE_EDL, ProfileKeys::EnableEDLWeather,
-                       settings.enable_edl);
+                       settings.edl.enabled);
 #endif
 
   _changed |= changed;

@@ -8,7 +8,7 @@
 class Widget;
 
 std::unique_ptr<Widget>
-CreateWeatherControlsOverlayWidget() noexcept;
+CreateEdlControlsOverlayWidget() noexcept;
 
 std::unique_ptr<Widget>
-CreateWeatherControlsBottomWidget() noexcept;
+CreateEdlControlsBottomWidget() noexcept;

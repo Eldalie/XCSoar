@@ -1,14 +1,23 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright The XCSoar Project
 
-#include "LevelResolver.hpp"
-#include "Request.hpp"
+#include "Levels.hpp"
 
 #include <cstdlib>
 
 namespace EDL {
 
-ResolvedLevel
+bool
+IsSupportedIsobar(unsigned isobar) noexcept
+{
+  for (unsigned value : ISOBARS)
+    if (value == isobar)
+      return true;
+
+  return false;
+}
+
+unsigned
 ResolveLevel(AtmosphericPressure qnh, bool qnh_available,
              double altitude) noexcept
 {
@@ -29,10 +38,7 @@ ResolveLevel(AtmosphericPressure qnh, bool qnh_available,
     }
   }
 
-  return {
-    static_pressure,
-    best_isobar,
-  };
+  return best_isobar;
 }
 
 } // namespace EDL

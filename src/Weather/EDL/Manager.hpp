@@ -15,13 +15,10 @@ void
 ResetForDedicatedPage() noexcept;
 
 void
+UpdateCurrentLevel() noexcept;
+
+void
 EnsureInitialised() noexcept;
-
-void
-StepForecast(std::chrono::hours delta) noexcept;
-
-void
-SelectIsobar(unsigned isobar) noexcept;
 
 bool
 ShouldShowOnMainMap() noexcept;

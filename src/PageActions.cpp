@@ -13,7 +13,7 @@
 #include "UIGlobals.hpp"
 #include "MapWindow/GlueMapWindow.hpp"
 #include "Components.hpp"
-#include "Dialogs/Weather/WeatherControlsWidget.hpp"
+#include "Dialogs/Weather/EdlControlsWidget.hpp"
 #include "Weather/EDL/Manager.hpp"
 
 #if defined(ENABLE_SDL) && defined(main)
@@ -220,7 +220,7 @@ LoadBottom(PageLayout::Bottom bottom)
   case PageLayout::Bottom::EDL_CONTROLS: {
     /* The same bottom widget is used by dedicated EDL pages and by
        special weather pages opened from input events. */
-    auto widget = CreateWeatherControlsBottomWidget();
+    auto widget = CreateEdlControlsBottomWidget();
     CommonInterface::main_window->SetBottomWidget(widget.release());
     break;
   }

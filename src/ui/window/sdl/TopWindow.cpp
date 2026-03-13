@@ -258,8 +258,8 @@ TopWindow::OnEvent(const SDL_Event &event)
            setCollectionBehavior:
            NSWindowCollectionBehaviorFullScreenPrimary];
         }
-#endif
         Invalidate();
+#endif
       }
       return true;
 

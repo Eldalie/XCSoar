@@ -3,10 +3,9 @@
 
 #include "Manager.hpp"
 
-#include "Download.hpp"
-#include "LevelResolver.hpp"
+#include "Levels.hpp"
+#include "Store.hpp"
 #include "MbTilesOverlay.hpp"
-#include "Request.hpp"
 #include "Interface.hpp"
 #include "Language/Language.hpp"
 #include "MapWindow/GlueMapWindow.hpp"
@@ -45,20 +44,19 @@ GetCurrentAircraftAltitude() noexcept
   return 3000;
 }
 
-static void
-ResolveCurrentLevel() noexcept
+void
+UpdateCurrentLevel() noexcept
 {
-  auto &state = CommonInterface::SetUIState().weather;
-  const auto resolved = ResolveLevel(CommonInterface::GetComputerSettings().pressure,
-                                     CommonInterface::GetComputerSettings().pressure_available,
-                                     state.edl_altitude);
-  state.edl_isobar = resolved.isobar;
+  auto &state = CommonInterface::SetUIState().weather.edl;
+  state.isobar = ResolveLevel(CommonInterface::GetComputerSettings().pressure,
+                              CommonInterface::GetComputerSettings().pressure_available,
+                              GetCurrentAircraftAltitude());
 }
 
 void
 EnsureInitialised() noexcept
 {
-  auto &state = CommonInterface::SetUIState().weather;
+  auto &state = CommonInterface::SetUIState().weather.edl;
 
   /* Overlay mode may enter through the weather dialog without visiting
      the dedicated page first, so make the shared state self-healing. */
@@ -68,57 +66,41 @@ EnsureInitialised() noexcept
                                              now.hour, 0, 0);
   }
 
-  if (!IsSupportedIsobar(state.edl_isobar))
-    ResolveCurrentLevel();
+  if (!IsSupportedIsobar(state.isobar))
+    UpdateCurrentLevel();
 
-  if (CommonInterface::GetComputerSettings().weather.enable_edl &&
-      state.edl_status == WeatherUIState::EDLStatus::DISABLED)
-    state.edl_status = WeatherUIState::EDLStatus::IDLE;
+  if (CommonInterface::GetComputerSettings().weather.edl.enabled &&
+      state.status == EDLWeatherUIState::Status::DISABLED)
+    state.status = EDLWeatherUIState::Status::IDLE;
 }
 
 void
 ResetForDedicatedPage() noexcept
 {
-  auto &state = CommonInterface::SetUIState().weather;
+  auto &state = CommonInterface::SetUIState().weather.edl;
   const auto now = BrokenDateTime::NowUTC();
   /* Dedicated EDL pages always start from the current hour/current
      aircraft altitude instead of preserving a stale previous view. */
   state.forecast_datetime = BrokenDateTime(now.year, now.month, now.day,
                                            now.hour, 0, 0);
-  state.edl_altitude = GetCurrentAircraftAltitude();
-  ResolveCurrentLevel();
+  UpdateCurrentLevel();
 
-  if (CommonInterface::GetComputerSettings().weather.enable_edl)
-    state.edl_status = WeatherUIState::EDLStatus::IDLE;
+  if (CommonInterface::GetComputerSettings().weather.edl.enabled)
+    state.status = EDLWeatherUIState::Status::IDLE;
   else
-    state.edl_status = WeatherUIState::EDLStatus::DISABLED;
-}
-
-void
-StepForecast(std::chrono::hours delta) noexcept
-{
-  auto &state = CommonInterface::SetUIState().weather;
-  state.forecast_datetime = state.forecast_datetime + delta;
-}
-
-void
-SelectIsobar(unsigned isobar) noexcept
-{
-  auto &state = CommonInterface::SetUIState().weather;
-  state.edl_isobar = isobar;
-  state.edl_altitude = GetAltitudeForIsobar(isobar);
+    state.status = EDLWeatherUIState::Status::DISABLED;
 }
 
 bool
 ShouldShowOnMainMap() noexcept
 {
-  return CommonInterface::GetComputerSettings().weather.show_edl_on_main_map;
+  return CommonInterface::GetComputerSettings().weather.edl.show_on_main_map;
 }
 
 void
 SetShowOnMainMap(bool enabled) noexcept
 {
-  CommonInterface::SetComputerSettings().weather.show_edl_on_main_map = enabled;
+  CommonInterface::SetComputerSettings().weather.edl.show_on_main_map = enabled;
   Profile::Set(ProfileKeys::ShowEDLOnMainMap, enabled);
 }
 
@@ -132,7 +114,7 @@ ClearOverlay() noexcept
 bool
 OverlayEnabled() noexcept
 {
-  return CommonInterface::GetComputerSettings().weather.enable_edl;
+  return CommonInterface::GetComputerSettings().weather.edl.enabled;
 }
 
 bool
@@ -146,34 +128,34 @@ OverlayVisible() noexcept
 void
 SetLoadingStatus() noexcept
 {
-  auto &state = CommonInterface::SetUIState().weather;
+  auto &state = CommonInterface::SetUIState().weather.edl;
   if (!OverlayEnabled()) {
-    state.edl_status = WeatherUIState::EDLStatus::DISABLED;
+    state.status = EDLWeatherUIState::Status::DISABLED;
     return;
   }
 
-  state.edl_status = WeatherUIState::EDLStatus::LOADING;
+  state.status = EDLWeatherUIState::Status::LOADING;
 }
 
 void
 SetIdleStatus() noexcept
 {
-  auto &state = CommonInterface::SetUIState().weather;
-  state.edl_status = OverlayEnabled()
-    ? WeatherUIState::EDLStatus::IDLE
-    : WeatherUIState::EDLStatus::DISABLED;
+  auto &state = CommonInterface::SetUIState().weather.edl;
+  state.status = OverlayEnabled()
+    ? EDLWeatherUIState::Status::IDLE
+    : EDLWeatherUIState::Status::DISABLED;
 }
 
 void
 SetErrorStatus() noexcept
 {
-  CommonInterface::SetUIState().weather.edl_status = WeatherUIState::EDLStatus::ERROR;
+  CommonInterface::SetUIState().weather.edl.status = EDLWeatherUIState::Status::ERROR;
 }
 
 void
 ApplyOverlay(Path path) noexcept
 {
-  auto &state = CommonInterface::SetUIState().weather;
+  auto &state = CommonInterface::SetUIState().weather.edl;
   /* Reuse the generic overlay HUD by exposing the active EDL state as
      the overlay label instead of showing this mapping only in a widget. */
   const auto label = GetOverlayLabel();
@@ -184,8 +166,8 @@ ApplyOverlay(Path path) noexcept
     map->QuickRedraw();
   }
 
-  state.edl_enabled = true;
-  state.edl_status = WeatherUIState::EDLStatus::READY;
+  state.enabled = true;
+  state.status = EDLWeatherUIState::Status::READY;
 }
 
 void
@@ -200,16 +182,16 @@ RefreshOverlayVisibility() noexcept
 const char *
 GetStatusLabel() noexcept
 {
-  switch (CommonInterface::GetUIState().weather.edl_status) {
-  case WeatherUIState::EDLStatus::DISABLED:
+  switch (CommonInterface::GetUIState().weather.edl.status) {
+  case EDLWeatherUIState::Status::DISABLED:
     return _("Disabled");
-  case WeatherUIState::EDLStatus::IDLE:
+  case EDLWeatherUIState::Status::IDLE:
     return _("Idle");
-  case WeatherUIState::EDLStatus::LOADING:
+  case EDLWeatherUIState::Status::LOADING:
     return _("Loading");
-  case WeatherUIState::EDLStatus::READY:
+  case EDLWeatherUIState::Status::READY:
     return _("Ready");
-  case WeatherUIState::EDLStatus::ERROR:
+  case EDLWeatherUIState::Status::ERROR:
     return _("Error");
   }
 
@@ -219,7 +201,7 @@ GetStatusLabel() noexcept
 BrokenDateTime
 GetForecastTime() noexcept
 {
-  return CommonInterface::GetUIState().weather.forecast_datetime;
+  return CommonInterface::GetUIState().weather.edl.forecast_datetime;
 }
 
 BrokenDateTime
@@ -253,13 +235,13 @@ GetOverlayLabel() noexcept
 int
 GetAltitude() noexcept
 {
-  return CommonInterface::GetUIState().weather.edl_altitude;
+  return GetAltitudeForIsobar(GetIsobar());
 }
 
 unsigned
 GetIsobar() noexcept
 {
-  return CommonInterface::GetUIState().weather.edl_isobar;
+  return CommonInterface::GetUIState().weather.edl.isobar;
 }
 
 int

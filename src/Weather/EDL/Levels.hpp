@@ -7,17 +7,21 @@
 
 namespace EDL {
 
-struct ResolvedLevel {
-  AtmosphericPressure pressure;
-  unsigned isobar;
-
-  constexpr unsigned GetHectoPascal() const noexcept {
-    return isobar / 100;
-  }
+static constexpr unsigned NUM_ISOBARS = 5;
+static constexpr unsigned ISOBARS[NUM_ISOBARS] = {
+  50000,
+  60000,
+  70000,
+  80000,
+  90000,
 };
 
 [[gnu::pure]]
-ResolvedLevel
+bool
+IsSupportedIsobar(unsigned isobar) noexcept;
+
+[[gnu::pure]]
+unsigned
 ResolveLevel(AtmosphericPressure qnh, bool qnh_available,
              double altitude) noexcept;
 

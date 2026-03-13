@@ -3,15 +3,12 @@
 
 #pragma once
 
+#include "Sqlite.hpp"
 #include "Geo/GeoBounds.hpp"
-#include "system/Path.hpp"
 #include "util/StaticString.hxx"
 
 #include <cstddef>
-#include <span>
 #include <vector>
-
-struct sqlite3;
 
 namespace EDL {
 
@@ -23,14 +20,14 @@ struct MbTilesMetadata {
 };
 
 class MbTilesDatabase {
-  sqlite3 *db = nullptr;
+  SqliteDatabase db;
   MbTilesMetadata metadata;
 
 public:
   explicit MbTilesDatabase(Path path);
-  MbTilesDatabase(MbTilesDatabase &&other) noexcept;
-  MbTilesDatabase &operator=(MbTilesDatabase &&other) noexcept;
-  ~MbTilesDatabase() noexcept;
+  MbTilesDatabase(MbTilesDatabase &&other) noexcept = default;
+  MbTilesDatabase &operator=(MbTilesDatabase &&other) noexcept = default;
+  ~MbTilesDatabase() noexcept = default;
 
   MbTilesDatabase(const MbTilesDatabase &) = delete;
   MbTilesDatabase &operator=(const MbTilesDatabase &) = delete;

@@ -194,8 +194,8 @@ $(eval $(call link-program,TestMETARParser,TEST_METAR_PARSER))
 
 TEST_EDL_SOURCES = \
 	$(SRC)/LocalPath.cpp \
-	$(SRC)/Weather/EDL/Request.cpp \
-	$(SRC)/Weather/EDL/LevelResolver.cpp \
+	$(SRC)/Weather/EDL/Levels.cpp \
+	$(SRC)/Weather/EDL/Store.cpp \
 	$(TEST_SRC_DIR)/tap.c \
 	$(TEST_SRC_DIR)/TestEDL.cpp
 TEST_EDL_DEPENDS = IO OS MATH TIME UTIL

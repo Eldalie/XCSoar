@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright The XCSoar Project
 
-#include "WeatherControlsWidget.hpp"
+#include "EdlControlsWidget.hpp"
 
 #include "Dialogs/CoFunctionDialog.hpp"
 #include "Dialogs/Error.hpp"
@@ -21,10 +21,10 @@
 #include "UIGlobals.hpp"
 #ifdef HAVE_HTTP
 #include "net/http/Init.hpp"
-#include "Weather/EDL/Download.hpp"
+#include "Weather/EDL/Levels.hpp"
+#include "Weather/EDL/Store.hpp"
 #endif
 #include "Weather/EDL/Manager.hpp"
-#include "Weather/EDL/Request.hpp"
 #include "Widget/RowFormWidget.hpp"
 #include "Widget/WindowWidget.hpp"
 #include "ui/dim/Size.hpp"
@@ -79,7 +79,7 @@ public:
   }
 };
 
-class WeatherControlsWidget final : public RowFormWidget {
+class EdlControlsWidget final : public RowFormWidget {
   /* The bottom widget stays compact by exposing time/level as generic
      selectors instead of a row per action. */
   static constexpr unsigned FORECAST_CHOICES = 24;
@@ -95,7 +95,7 @@ class WeatherControlsWidget final : public RowFormWidget {
   Button *clean_other_days_button = nullptr;
 
 public:
-  explicit WeatherControlsWidget(bool _dialog_mode) noexcept
+  explicit EdlControlsWidget(bool _dialog_mode) noexcept
     :RowFormWidget(UIGlobals::GetDialogLook()),
      dialog_mode(_dialog_mode) {}
 
@@ -118,7 +118,7 @@ private:
 };
 
 PixelSize
-WeatherControlsWidget::GetMinimumSize() const noexcept
+EdlControlsWidget::GetMinimumSize() const noexcept
 {
   const unsigned caption_width =
     UIGlobals::GetDialogLook().text_font.TextSize("Forecast").width;
@@ -135,7 +135,7 @@ WeatherControlsWidget::GetMinimumSize() const noexcept
 }
 
 PixelSize
-WeatherControlsWidget::GetMaximumSize() const noexcept
+EdlControlsWidget::GetMaximumSize() const noexcept
 {
   const auto minimum = GetMinimumSize();
   const unsigned rows = dialog_mode ? 6u : 2u;
@@ -143,8 +143,8 @@ WeatherControlsWidget::GetMaximumSize() const noexcept
 }
 
 void
-WeatherControlsWidget::Initialise(ContainerWindow &parent,
-                                  const PixelRect &rc) noexcept
+EdlControlsWidget::Initialise(ContainerWindow &parent,
+                              const PixelRect &rc) noexcept
 {
   assert(!IsDefined());
 
@@ -158,7 +158,7 @@ WeatherControlsWidget::Initialise(ContainerWindow &parent,
 }
 
 StaticString<40>
-WeatherControlsWidget::FormatDayLabel(const EDL::CachedDay &day) noexcept
+EdlControlsWidget::FormatDayLabel(const EDL::CachedDay &day) noexcept
 {
   StaticString<40> label;
   label.Format("%04u-%02u-%02u (%s, %u)",
@@ -169,7 +169,7 @@ WeatherControlsWidget::FormatDayLabel(const EDL::CachedDay &day) noexcept
 }
 
 void
-WeatherControlsWidget::FillForecastControl() noexcept
+EdlControlsWidget::FillForecastControl() noexcept
 {
   /* The widget may be prepared before the EDL state has been touched in
      this session.  Normalise it before doing BrokenDateTime arithmetic. */
@@ -201,7 +201,7 @@ WeatherControlsWidget::FillForecastControl() noexcept
 }
 
 void
-WeatherControlsWidget::FillLevelControl() noexcept
+EdlControlsWidget::FillLevelControl() noexcept
 {
   auto &df = (DataFieldEnum &)*level_control->GetDataField();
   df.ClearChoices();
@@ -219,7 +219,7 @@ WeatherControlsWidget::FillLevelControl() noexcept
 }
 
 void
-WeatherControlsWidget::FillCachedDayControl() noexcept
+EdlControlsWidget::FillCachedDayControl() noexcept
 {
   if (cached_day_control == nullptr)
     return;
@@ -256,7 +256,7 @@ WeatherControlsWidget::FillCachedDayControl() noexcept
 }
 
 void
-WeatherControlsWidget::UpdateControls() noexcept
+EdlControlsWidget::UpdateControls() noexcept
 {
   FillForecastControl();
   FillLevelControl();
@@ -264,7 +264,7 @@ WeatherControlsWidget::UpdateControls() noexcept
 }
 
 void
-WeatherControlsWidget::Prepare(ContainerWindow &parent, const PixelRect &rc) noexcept
+EdlControlsWidget::Prepare(ContainerWindow &parent, const PixelRect &rc) noexcept
 {
   RowFormWidget::Prepare(parent, rc);
 
@@ -281,7 +281,7 @@ WeatherControlsWidget::Prepare(ContainerWindow &parent, const PixelRect &rc) noe
     const auto index =
       ((const DataFieldEnum &)*forecast_control->GetDataField()).GetValue();
     if (index < forecast_choices.size())
-      CommonInterface::SetUIState().weather.forecast_datetime = forecast_choices[index];
+      CommonInterface::SetUIState().weather.edl.forecast_datetime = forecast_choices[index];
 
     FillForecastControl();
     UpdateControls();
@@ -290,7 +290,8 @@ WeatherControlsWidget::Prepare(ContainerWindow &parent, const PixelRect &rc) noe
 
   level_control = AddEnum(_("Level"), nullptr);
   level_control->GetDataField()->SetOnModified([this]{
-    EDL::SelectIsobar(((const DataFieldEnum &)*level_control->GetDataField()).GetValue());
+    CommonInterface::SetUIState().weather.edl.SelectIsobar(
+      ((const DataFieldEnum &)*level_control->GetDataField()).GetValue());
     FillLevelControl();
     UpdateControls();
     UpdateOverlay();
@@ -316,7 +317,7 @@ WeatherControlsWidget::Prepare(ContainerWindow &parent, const PixelRect &rc) noe
 }
 
 void
-WeatherControlsWidget::Show(const PixelRect &rc) noexcept
+EdlControlsWidget::Show(const PixelRect &rc) noexcept
 {
   RowFormWidget::Show(rc);
 
@@ -342,7 +343,7 @@ WeatherControlsWidget::Show(const PixelRect &rc) noexcept
 }
 
 void
-WeatherControlsWidget::Unprepare() noexcept
+EdlControlsWidget::Unprepare() noexcept
 {
   forecast_control = nullptr;
   level_control = nullptr;
@@ -355,7 +356,7 @@ WeatherControlsWidget::Unprepare() noexcept
 }
 
 void
-WeatherControlsWidget::UpdateOverlay()
+EdlControlsWidget::UpdateOverlay()
 {
 #if !defined(HAVE_HTTP)
   ShowMessageBox(_("HTTP support is not available in this build."),
@@ -371,12 +372,11 @@ WeatherControlsWidget::UpdateOverlay()
     EDL::SetLoadingStatus();
     UpdateControls();
 
+    const EDL::TileRequest request(EDL::GetForecastTime(), EDL::GetIsobar());
     auto path = ShowCoFunctionDialog(UIGlobals::GetMainWindow(),
                                      UIGlobals::GetDialogLook(),
                                      _("Download"),
-                                     EDL::EnsureDownloaded(EDL::GetForecastTime(),
-                                                           EDL::GetIsobar(),
-                                                           *Net::curl, env),
+                                     request.EnsureDownloaded(*Net::curl, env),
                                      &env);
     if (!path) {
       EDL::SetIdleStatus();
@@ -399,7 +399,7 @@ WeatherControlsWidget::UpdateOverlay()
 }
 
 void
-WeatherControlsWidget::PrecacheDay()
+EdlControlsWidget::PrecacheDay()
 {
 #if !defined(HAVE_HTTP)
   ShowMessageBox(_("HTTP support is not available in this build."),
@@ -431,7 +431,7 @@ WeatherControlsWidget::PrecacheDay()
 }
 
 void
-WeatherControlsWidget::CleanOtherDays()
+EdlControlsWidget::CleanOtherDays()
 {
   if (cached_days.empty())
     return;
@@ -458,13 +458,13 @@ WeatherControlsWidget::CleanOtherDays()
 }
 
 std::unique_ptr<Widget>
-CreateWeatherControlsOverlayWidget() noexcept
+CreateEdlControlsOverlayWidget() noexcept
 {
-  return std::make_unique<WeatherControlsWidget>(true);
+  return std::make_unique<EdlControlsWidget>(true);
 }
 
 std::unique_ptr<Widget>
-CreateWeatherControlsBottomWidget() noexcept
+CreateEdlControlsBottomWidget() noexcept
 {
-  return std::make_unique<WeatherControlsWidget>(false);
+  return std::make_unique<EdlControlsWidget>(false);
 }
